@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+.DS_Store
+mailru_pdfs/
+mailru_downloads.json
+reports_history/
+telegram_reports/
+dashboard.html
+parsed_reports.json
+weather_moscow_hourly.json
+*.pdf

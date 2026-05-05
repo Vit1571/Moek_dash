@@ -1,0 +1,4 @@
+# Optional per-meter temperature graph mapping.
+# Leave serial_number/point/resource empty to avoid matching by that field.
+# Available graph_profile values are listed in moek_temperature_graph.csv.
+serial_number,point,resource,graph_profile

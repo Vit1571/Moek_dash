@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -186,7 +187,7 @@ class TelegramBot:
             rows.append(
                 [
                     {
-                        "text": trim_button(short_meter_title(meter)),
+                        "text": trim_button(meter_button_title(meter)),
                         "callback_data": f"meter:{index}",
                     }
                 ]
@@ -314,6 +315,19 @@ def trim_button(text: str, limit: int = 58) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 1].rstrip() + "…"
+
+
+def meter_button_title(meter: dict[str, Any]) -> str:
+    title = short_meter_title(meter)
+    address = clean_address(meter.get("object"))
+    return f"{title} | {address}" if address else title
+
+
+def clean_address(value: Any) -> str:
+    text = str(value or "").strip()
+    text = re.sub(r"^\s*москва\s*г\s*,?\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip(" ,")
 
 
 def load_env_file(path: Path) -> None:

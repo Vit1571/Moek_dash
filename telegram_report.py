@@ -25,7 +25,7 @@ COLUMNS = [
     ("dt", "dT"),
     ("Q", "Q"),
     ("runtime", "Нараб."),
-    ("outside", "Tнаруж."),
+    ("outside", "T нар."),
 ]
 
 FONT_CANDIDATES = [
@@ -171,7 +171,7 @@ def draw_report(
     object_text = str(meter.get("object") or "").strip()
     if object_text:
         meta_lines.extend(wrap_text(object_text, meta_font, table_width, max_lines=3))
-    title_h = 88 + len(meta_lines) * 26
+    title_h = 126 + len(meta_lines) * 26
     height = title_h + header_h + row_h * len(rows) + footer_h
 
     img = Image.new("RGB", (width, height), "#f5f7fb")
@@ -179,13 +179,14 @@ def draw_report(
 
     draw.rectangle((0, 0, width, 16), fill="#2563eb")
     draw.text((left, 30), "Часовая распечатка за последние 36 часов", fill="#111827", font=header_font)
-    meta_y = 72
+    period = f"{format_period_time(start_timestamp)} - {format_period_time(end_timestamp)}"
+    period_y = 66
+    draw.text((left, period_y), period, fill="#64748b", font=meta_font)
+
+    meta_y = 98
     for line in meta_lines:
         draw.text((left, meta_y), line, fill="#475569", font=meta_font)
         meta_y += 26
-
-    period = f"{format_period_time(start_timestamp)} - {format_period_time(end_timestamp)}"
-    draw.text((width - right - text_width(draw, period, meta_font), 34), period, fill="#64748b", font=meta_font)
 
     y = title_h
     x = left
@@ -241,7 +242,7 @@ def format_row(row: dict[str, Any]) -> list[str]:
         format_number(delta_t(row), 1),
         format_number(first_present(row, "Q", "Qtv"), 2),
         format_number(row.get("runtime_hours"), 2),
-        format_number(first_present(row, "weather_temp", "outside_temp_used", "ta"), 1),
+        format_number(outside_temperature(row), 1),
     ]
 
 
@@ -272,6 +273,18 @@ def first_present(row: dict[str, Any], *keys: str) -> Any:
         value = row.get(key)
         if value is not None:
             return value
+    return None
+
+
+def outside_temperature(row: dict[str, Any]) -> float | None:
+    for key in ("weather_temp", "outside_temp_used"):
+        value = numeric(row.get(key))
+        if value is not None and -55 < value < 55:
+            return value
+
+    ta = numeric(row.get("ta"))
+    if ta is not None and -55 < ta < 55:
+        return ta
     return None
 
 

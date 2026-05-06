@@ -7,6 +7,7 @@ import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -14,6 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 DEFAULT_DATA_PATH = Path("parsed_reports.json")
 DEFAULT_OUTPUT_DIR = Path("telegram_reports")
 REPORT_HOURS = 36
+MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 
 COLUMNS = [
     ("time", "Дата время"),
@@ -143,7 +145,7 @@ def report_path(meter: dict[str, Any], output_dir: str | Path, rows: list[dict[s
     serial = sanitize_filename(meter.get("serial_number") or "meter")
     point = sanitize_filename(meter.get("point") or "system")
     resource = sanitize_filename(meter.get("resource") or "resource")
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    stamp = moscow_now().strftime("%Y%m%d_%H%M%S")
     period = sanitize_filename((rows[-1].get("timestamp") or stamp).replace("T", "_"))
     return Path(output_dir) / f"hourly_{serial}_{resource}_{point}_{period}_{stamp}.png"
 
@@ -226,9 +228,13 @@ def draw_report(
         draw.line((left, y + row_h, left + table_width, y + row_h), fill="#e2e8f0")
         y += row_h
 
-    generated = "Сформировано: " + datetime.now().strftime("%d.%m.%Y %H:%M")
+    generated = "Сформировано: " + moscow_now().strftime("%d.%m.%Y %H:%M")
     draw.text((left, height - 30), generated, fill="#64748b", font=meta_font)
     return img
+
+
+def moscow_now() -> datetime:
+    return datetime.now(MOSCOW_TZ)
 
 
 def format_row(row: dict[str, Any]) -> list[str]:

@@ -1,32 +1,19 @@
-name: Run Telegram Bot Service
+name: Run Telegram Bot (20 min)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/run_bot.yml"
-      - "build_dashboard.py"
-      - "eldis_collector.py"
-      - "meter_analytics.py"
-      - "telegram_bot.py"
-      - "telegram_bot_service.py"
-      - "telegram_report.py"
-      - "weather_fetcher.py"
 
 permissions:
   contents: read
-  actions: write
 
 concurrency:
   group: telegram-bot-polling
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 355
+    timeout-minutes: 25
 
     env:
       # Подтягиваем переменные для Элдис, чтобы скрипт мог собрать данные
@@ -65,15 +52,9 @@ jobs:
       - name: Run bot service
         run: |
           set +e
-          timeout 20700 python telegram_bot_service.py
+          timeout 1200 python telegram_bot_service.py
           code=$?
           set -e
           if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then
             exit "$code"
           fi
-
-      - name: Start next bot run
-        if: ${{ success() }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run run_bot.yml --ref "${GITHUB_REF_NAME}"

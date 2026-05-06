@@ -1,11 +1,24 @@
 name: Run Telegram Bot (20 min)
 
 on:
-  workflow_dispatch: # Триггер для появления кнопки ручного запуска
+  workflow_dispatch:
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+
+    env:
+      # Подтягиваем переменные для Элдис, чтобы скрипт мог собрать данные
+      ELDIS_API_BASE: ${{ vars.ELDIS_API_BASE || 'https://api.eldis24.ru/api/v1' }}
+      ELDIS_LOOKBACK_MONTHS: ${{ vars.ELDIS_LOOKBACK_MONTHS || '2' }}
+      ELDIS_ACCOUNT_1_NAME: ${{ vars.ELDIS_ACCOUNT_1_NAME || 'account_1' }}
+      ELDIS_ACCOUNT_1_KEY: ${{ secrets.ELDIS_ACCOUNT_1_KEY }}
+      ELDIS_ACCOUNT_1_LOGIN: ${{ secrets.ELDIS_ACCOUNT_1_LOGIN }}
+      ELDIS_ACCOUNT_1_PASSWORD: ${{ secrets.ELDIS_ACCOUNT_1_PASSWORD }}
+      ELDIS_ACCOUNT_2_NAME: ${{ vars.ELDIS_ACCOUNT_2_NAME || 'account_2' }}
+      ELDIS_ACCOUNT_2_KEY: ${{ secrets.ELDIS_ACCOUNT_2_KEY }}
+      ELDIS_ACCOUNT_2_LOGIN: ${{ secrets.ELDIS_ACCOUNT_2_LOGIN }}
+      ELDIS_ACCOUNT_2_PASSWORD: ${{ secrets.ELDIS_ACCOUNT_2_PASSWORD }}
 
     steps:
       - name: Checkout repository
@@ -20,10 +33,14 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Collect data and Generate JSON
+        run: |
+          # Сначала скачиваем отчеты Элдис
+          python eldis_collector.py --collect --output eldis_reports.json
+          # Затем формируем тот самый parsed_reports.json
+          python build_dashboard.py --reports-json eldis_reports.json --json-output parsed_reports.json
+
       - name: Run bot for 20 minutes
         env:
-          # Подтягиваем токен из секретов GitHub
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        # Команда timeout принудительно завершит работу скрипта через 1200 секунд
-        # Конструкция '|| true' нужна, чтобы GitHub не считал таймаут ошибкой (красным крестиком)
         run: timeout 1200 python telegram_bot.py || true

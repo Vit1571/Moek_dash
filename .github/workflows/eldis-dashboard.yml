@@ -1,0 +1,82 @@
+name: Eldis dashboard
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/30 * * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: eldis-dashboard-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      ELDIS_API_BASE: ${{ vars.ELDIS_API_BASE || 'https://api.eldis24.ru/api/v1' }}
+      ELDIS_LOOKBACK_MONTHS: ${{ vars.ELDIS_LOOKBACK_MONTHS || '2' }}
+      ELDIS_TIMEOUT: ${{ vars.ELDIS_TIMEOUT || '60' }}
+      ELDIS_REQUEST_PAUSE_SECONDS: ${{ vars.ELDIS_REQUEST_PAUSE_SECONDS || '0' }}
+
+      ELDIS_ACCOUNT_1_NAME: ${{ vars.ELDIS_ACCOUNT_1_NAME || 'account_1' }}
+      ELDIS_ACCOUNT_1_KEY: ${{ secrets.ELDIS_ACCOUNT_1_KEY }}
+      ELDIS_ACCOUNT_1_LOGIN: ${{ secrets.ELDIS_ACCOUNT_1_LOGIN }}
+      ELDIS_ACCOUNT_1_PASSWORD: ${{ secrets.ELDIS_ACCOUNT_1_PASSWORD }}
+
+      ELDIS_ACCOUNT_2_NAME: ${{ vars.ELDIS_ACCOUNT_2_NAME || 'account_2' }}
+      ELDIS_ACCOUNT_2_KEY: ${{ secrets.ELDIS_ACCOUNT_2_KEY }}
+      ELDIS_ACCOUNT_2_LOGIN: ${{ secrets.ELDIS_ACCOUNT_2_LOGIN }}
+      ELDIS_ACCOUNT_2_PASSWORD: ${{ secrets.ELDIS_ACCOUNT_2_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Collect Eldis reports
+        run: python eldis_collector.py --collect --output eldis_reports.json
+
+      - name: Build dashboard
+        run: |
+          mkdir -p public
+          python build_dashboard.py \
+            --reports-json eldis_reports.json \
+            --output public/index.html \
+            --json-output parsed_reports.json \
+            --weather-cache weather_moscow_hourly.json
+          cp public/index.html public/dashboard.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -4,34 +4,27 @@ import argparse
 import subprocess
 import sys
 import time
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
-from types import SimpleNamespace
-
-from mail_collector import collect_mailru_pdfs, load_config, load_env_file, subtract_months
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Check Mail.ru every 30 minutes and rebuild dashboard when new PDFs arrive."
+        description="Collect Eldis data every 30 minutes and rebuild dashboard."
     )
-    parser.add_argument("--env", default=".env", help="Path to local .env file.")
     parser.add_argument("--interval-minutes", type=float, default=30.0)
-    parser.add_argument("--once", action="store_true", help="Run one check and exit.")
-    parser.add_argument(
-        "--force-build",
-        action="store_true",
-        help="Rebuild dashboard even if no new PDFs were downloaded.",
-    )
+    parser.add_argument("--once", action="store_true", help="Run one Eldis update and exit.")
+    parser.add_argument("--env", default=".env", help="Path to local .env file.")
     parser.add_argument("--history-dir", default="reports_history")
+    parser.add_argument("--reports-json", default="eldis_reports.json")
+    parser.add_argument("--resources", default="heat,gvs")
+    parser.add_argument("--months", type=int, help="Lookback months for Eldis collection.")
+    parser.add_argument("--days", type=int, help="Lookback days for Eldis collection.")
+    parser.add_argument("--no-weather-fetch", action="store_true")
     args = parser.parse_args()
 
     while True:
-        try:
-            run_once(args)
-        except Exception as exc:
-            print(f"[{now()}] ERROR: {exc}", flush=True)
-
+        run_once(args)
         if args.once:
             return
 
@@ -41,39 +34,50 @@ def main() -> None:
 
 
 def run_once(args: argparse.Namespace) -> None:
-    load_env_file(Path(args.env))
-    config = load_config(
-        SimpleNamespace(
-            folder=None,
-            months=None,
-            output_dir=None,
-        )
-    )
-    since = subtract_months(date.today(), config.lookback_months)
+    try:
+        collect_eldis(args)
+        build_dashboard(args)
+        print(f"[{now()}] Eldis dashboard update finished", flush=True)
+    except subprocess.CalledProcessError as exc:
+        print(f"[{now()}] ERROR: command failed with exit code {exc.returncode}", flush=True)
+    except Exception as exc:
+        print(f"[{now()}] ERROR: {exc}", flush=True)
 
-    print(f"[{now()}] Checking {config.email_address}/{config.folder} since {since}", flush=True)
-    result = collect_mailru_pdfs(config, since=since)
-    print(
-        f"[{now()}] Messages={result['messages']} pdf={result['pdf_attachments']} "
-        f"downloaded={result['downloaded']} duplicates={result['duplicates']}",
-        flush=True,
-    )
 
-    dashboard_path = Path("dashboard.html")
-    should_build = args.force_build or result["downloaded"] > 0 or not dashboard_path.exists()
-    if not should_build:
-        print(f"[{now()}] No new files, dashboard unchanged", flush=True)
-        return
+def collect_eldis(args: argparse.Namespace) -> None:
+    command = [
+        sys.executable,
+        "eldis_collector.py",
+        "--collect",
+        "--env",
+        args.env,
+        "--resources",
+        args.resources,
+        "--output",
+        args.reports_json,
+    ]
+    if args.months is not None:
+        command.extend(["--months", str(args.months)])
+    if args.days is not None:
+        command.extend(["--days", str(args.days)])
 
+    print(f"[{now()}] Collecting Eldis data", flush=True)
+    subprocess.run(command, check=True)
+
+
+def build_dashboard(args: argparse.Namespace) -> None:
     command = [
         sys.executable,
         "build_dashboard.py",
-        "--pdf-dir",
-        str(config.output_dir),
+        "--reports-json",
+        args.reports_json,
         "--history-dir",
         args.history_dir,
     ]
-    print(f"[{now()}] Building dashboard", flush=True)
+    if args.no_weather_fetch:
+        command.append("--no-weather-fetch")
+
+    print(f"[{now()}] Building dashboard from {Path(args.reports_json).resolve()}", flush=True)
     subprocess.run(command, check=True)
 
 

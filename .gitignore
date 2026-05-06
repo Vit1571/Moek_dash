@@ -9,4 +9,9 @@ telegram_reports/
 dashboard.html
 parsed_reports.json
 weather_moscow_hourly.json
+eldis_reports.json
+eldis_points.csv
+eldis_points.json
+eldis_raw/
+logs/
 *.pdf

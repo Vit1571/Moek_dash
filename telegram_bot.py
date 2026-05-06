@@ -23,6 +23,7 @@ from telegram_report import (
 
 ENV_PATH = Path(".env")
 TOKEN_ENV = "TELEGRAM_BOT_TOKEN"
+ALLOWED_CHAT_IDS_ENV = "TELEGRAM_ALLOWED_CHAT_IDS"
 POLL_TIMEOUT = 45
 HTTP_TIMEOUT = 90
 
@@ -43,16 +44,26 @@ def main() -> None:
             "Добавьте TELEGRAM_BOT_TOKEN в .env. Токен берется у @BotFather."
         )
 
-    bot = TelegramBot(token=token, data_path=DEFAULT_DATA_PATH)
+    bot = TelegramBot(
+        token=token,
+        data_path=DEFAULT_DATA_PATH,
+        allowed_chat_ids=parse_allowed_chat_ids(os.getenv(ALLOWED_CHAT_IDS_ENV, "")),
+    )
     print("Telegram bot started. Press Ctrl+C to stop.")
     bot.run()
 
 
 class TelegramBot:
-    def __init__(self, token: str, data_path: str | Path) -> None:
+    def __init__(
+        self,
+        token: str,
+        data_path: str | Path,
+        allowed_chat_ids: set[int] | None = None,
+    ) -> None:
         self.token = token
         self.base_url = f"https://api.telegram.org/bot{token}"
         self.data_path = Path(data_path)
+        self.allowed_chat_ids = allowed_chat_ids or set()
         self.offset: int | None = None
 
     def run(self) -> None:
@@ -85,6 +96,9 @@ class TelegramBot:
         chat_id = message.get("chat", {}).get("id")
         if not chat_id:
             return
+        if not self.is_allowed(chat_id):
+            self.send_message(chat_id, f"Доступ не разрешен. Ваш Telegram ID: {chat_id}")
+            return
 
         text = (message.get("text") or "").strip()
         if text.startswith("/start") or text.startswith("/help"):
@@ -105,6 +119,9 @@ class TelegramBot:
         if callback_id:
             self.api("answerCallbackQuery", {"callback_query_id": callback_id}, timeout=15)
         if not chat_id:
+            return
+        if not self.is_allowed(chat_id):
+            self.send_message(chat_id, f"Доступ не разрешен. Ваш Telegram ID: {chat_id}")
             return
 
         if data == "create_report":
@@ -218,6 +235,9 @@ class TelegramBot:
         files = {"photo": Path(path)}
         self.multipart_api("sendPhoto", fields, files)
 
+    def is_allowed(self, chat_id: int) -> bool:
+        return not self.allowed_chat_ids or chat_id in self.allowed_chat_ids
+
     def api(
         self,
         method: str,
@@ -307,6 +327,19 @@ def load_env_file(path: Path) -> None:
         key = key.strip()
         value = value.strip().strip('"').strip("'")
         os.environ.setdefault(key, value)
+
+
+def parse_allowed_chat_ids(value: str) -> set[int]:
+    ids: set[int] = set()
+    for item in value.replace(";", ",").split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            ids.add(int(item))
+        except ValueError:
+            print(f"Skipped invalid Telegram chat ID: {item}")
+    return ids
 
 
 if __name__ == "__main__":

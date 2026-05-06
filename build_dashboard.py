@@ -8,13 +8,16 @@ from pathlib import Path
 from typing import Any
 
 from meter_analytics import build_meters
-from moek_parser import parse_folder
 from weather_fetcher import update_moscow_weather_cache
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build MOEK heat meter MVP dashboard.")
     parser.add_argument("--pdf-dir", default=".", help="Folder with source PDF printouts.")
+    parser.add_argument(
+        "--reports-json",
+        help="Use already normalized reports JSON instead of parsing PDF printouts.",
+    )
     parser.add_argument("--output", default="dashboard.html", help="Output HTML file.")
     parser.add_argument("--json-output", default="parsed_reports.json", help="Output parsed JSON file.")
     parser.add_argument(
@@ -42,7 +45,15 @@ def main() -> None:
     args = parser.parse_args()
 
     pdf_dir = Path(args.pdf_dir)
-    reports = parse_folder(pdf_dir)
+    reports_source = str(pdf_dir.resolve())
+    if args.reports_json:
+        reports_path = Path(args.reports_json)
+        reports = load_reports_json(reports_path)
+        reports_source = str(reports_path.resolve())
+    else:
+        from moek_parser import parse_folder
+
+        reports = parse_folder(pdf_dir)
     weather_status = update_weather_if_needed(
         reports,
         args.weather_cache,
@@ -60,6 +71,7 @@ def main() -> None:
     payload = {
         "generated_at": generated_at,
         "pdf_dir": str(pdf_dir.resolve()),
+        "reports_source": reports_source,
         "report_count": len(reports),
         "graph_profile": args.graph_profile,
         "weather": weather_status,
@@ -86,6 +98,23 @@ def main() -> None:
     print(f"Weather: {weather_status['status']}")
     print(f"JSON: {json_path.resolve()}")
     print(f"Dashboard: {output_path.resolve()}")
+
+
+def load_reports_json(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        raise SystemExit(f"Reports JSON not found: {path}")
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, list):
+        reports = payload
+    elif isinstance(payload, dict) and isinstance(payload.get("reports"), list):
+        reports = payload["reports"]
+    else:
+        raise SystemExit(
+            "Reports JSON must be a list or an object with a 'reports' list."
+        )
+
+    return [report for report in reports if isinstance(report, dict)]
 
 
 def build_summary(meters: list[dict[str, Any]]) -> dict[str, Any]:

@@ -47,14 +47,98 @@ cd /Users/vitaliigudelev/Documents/Moek_dash
 ./run_pipeline.sh
 ```
 
-Автоматическая проверка почты каждые 30 минут:
+Автоматическая проверка Eldis каждые 30 минут:
 
 ```bash
 cd /Users/vitaliigudelev/Documents/Moek_dash
 ./run_scheduler.sh
 ```
 
-Планировщик пересобирает `dashboard.html` только если появились новые PDF. Исторические копии отчетов складываются в `reports_history`.
+Планировщик больше не обращается к Mail.ru: каждые 30 минут он собирает данные через Eldis API и пересобирает `dashboard.html`. Исторические копии отчетов складываются в `reports_history`.
+
+## Сбор из Eldis24
+
+Eldis24 можно использовать вместо PDF-распечаток. Сборщик сам получает доступные ТУ по двум кабинетам, забирает часовой архив (`typeDataCode=30003`) через `data/normalized` и приводит данные к тому же формату, который использует дашборд.
+
+Добавьте ключи API в `.env`:
+
+```env
+ELDIS_API_BASE=https://api.eldis24.ru/api/v1
+ELDIS_ACCOUNT_1_NAME=moek_1
+ELDIS_ACCOUNT_1_KEY=...
+ELDIS_ACCOUNT_1_LOGIN=...
+ELDIS_ACCOUNT_1_PASSWORD=...
+ELDIS_ACCOUNT_1_ACCESS_TOKEN=
+ELDIS_ACCOUNT_2_NAME=moek_2
+ELDIS_ACCOUNT_2_KEY=...
+ELDIS_ACCOUNT_2_LOGIN=...
+ELDIS_ACCOUNT_2_PASSWORD=...
+ELDIS_ACCOUNT_2_ACCESS_TOKEN=
+ELDIS_LOOKBACK_MONTHS=2
+```
+
+`ELDIS_ACCOUNT_*_ACCESS_TOKEN` обычно можно оставить пустым. Если заданы `LOGIN` и `PASSWORD`, сборщик сам вызовет `users/login` и получит `access_token` из Cookie.
+
+Проверить список доступных теплосчетчиков без загрузки архивов:
+
+```bash
+python3 eldis_collector.py --discover
+```
+
+Одна команда для полного обновления:
+
+```bash
+cd /Users/vitaliigudelev/Documents/Moek_dash
+./run_eldis_pipeline.sh
+```
+
+Автоматический режим каждые 30 минут:
+
+```bash
+./run_eldis_scheduler.sh
+```
+
+Фоновый запуск через macOS `launchd`, чтобы терминал можно было закрыть:
+
+```bash
+./install_eldis_launch_agent.sh
+```
+
+Остановить и удалить фоновую задачу:
+
+```bash
+./uninstall_eldis_launch_agent.sh
+```
+
+Логи фонового запуска пишутся в `logs/eldis_scheduler.out.log` и `logs/eldis_scheduler.err.log`.
+
+## Публикация через GitHub Pages
+
+Чтобы компьютер мог быть выключен, используйте GitHub Actions. Workflow `.github/workflows/eldis-dashboard.yml` каждые 30 минут собирает Eldis-данные, формирует `dashboard.html` как `index.html` и публикует его через GitHub Pages.
+
+Кратко:
+
+```text
+Settings -> Secrets and variables -> Actions -> Secrets
+```
+
+Добавьте секреты `ELDIS_ACCOUNT_1_KEY`, `ELDIS_ACCOUNT_1_LOGIN`, `ELDIS_ACCOUNT_1_PASSWORD` и такие же для `ELDIS_ACCOUNT_2`, если нужен второй аккаунт.
+
+Затем:
+
+```text
+Settings -> Pages -> Source: GitHub Actions
+Actions -> Eldis dashboard -> Run workflow
+```
+
+Подробная инструкция: `docs/github/eldis-pages.md`.
+
+После запуска появятся `eldis_points.csv` и `eldis_reports.json`, затем пересоберется обычный `dashboard.html`. Для ручного периода можно использовать:
+
+```bash
+python3 eldis_collector.py --collect --start 2026-03-01 --end 2026-05-01
+python3 build_dashboard.py --reports-json eldis_reports.json
+```
 
 ## Telegram-бот
 
@@ -70,7 +154,12 @@ cd /Users/vitaliigudelev/Documents/Moek_dash
 
 ```env
 TELEGRAM_BOT_TOKEN=...
+TELEGRAM_ALLOWED_CHAT_IDS=
 ```
+
+`TELEGRAM_ALLOWED_CHAT_IDS` можно оставить пустым, тогда бот отвечает всем, кто ему написал. Для ограничения доступа впишите один или несколько ID через запятую, например `123456789,987654321`.
+
+Чтобы узнать свой Telegram ID, запустите бота с пустым `TELEGRAM_ALLOWED_CHAT_IDS`, напишите ему `/start`, затем при необходимости впишите этот ID в `.env` и перезапустите бота.
 
 Запуск:
 
@@ -79,7 +168,7 @@ cd /Users/vitaliigudelev/Documents/Moek_dash
 ./run_telegram_bot.sh
 ```
 
-Бот читает уже собранный `parsed_reports.json`, поэтому перед запуском нужно хотя бы один раз выполнить `./run_pipeline.sh` или `python3 build_dashboard.py --pdf-dir mailru_pdfs`.
+Бот читает уже собранный `parsed_reports.json`, поэтому перед запуском нужно хотя бы один раз выполнить `./run_pipeline.sh`, `./run_eldis_pipeline.sh` или `python3 build_dashboard.py --pdf-dir mailru_pdfs`.
 
 Проверка генератора без Telegram:
 

@@ -277,14 +277,14 @@ def first_present(row: dict[str, Any], *keys: str) -> Any:
 
 
 def outside_temperature(row: dict[str, Any]) -> float | None:
-    for key in ("weather_temp", "outside_temp_used"):
-        value = numeric(row.get(key))
-        if value is not None and -55 < value < 55:
-            return value
+    weather_temp = numeric(row.get("weather_temp"))
+    if weather_temp is not None and -55 < weather_temp < 55:
+        return weather_temp
 
-    ta = numeric(row.get("ta"))
-    if ta is not None and -55 < ta < 55:
-        return ta
+    if row.get("outside_temp_source") == "weather":
+        outside_temp = numeric(row.get("outside_temp_used"))
+        if outside_temp is not None and -55 < outside_temp < 55:
+            return outside_temp
     return None
 
 

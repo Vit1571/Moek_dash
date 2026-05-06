@@ -1,18 +1,32 @@
-name: Run Telegram Bot (20 min)
+name: Run Telegram Bot Service
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "*/20 * * * *"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/run_bot.yml"
+      - "build_dashboard.py"
+      - "eldis_collector.py"
+      - "meter_analytics.py"
+      - "telegram_bot.py"
+      - "telegram_bot_service.py"
+      - "telegram_report.py"
+      - "weather_fetcher.py"
+
+permissions:
+  contents: read
+  actions: write
 
 concurrency:
   group: telegram-bot-polling
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 355
 
     env:
       # Подтягиваем переменные для Элдис, чтобы скрипт мог собрать данные
@@ -20,6 +34,7 @@ jobs:
       ELDIS_LOOKBACK_MONTHS: ${{ vars.ELDIS_LOOKBACK_MONTHS || '2' }}
       ELDIS_TIMEOUT: ${{ vars.ELDIS_TIMEOUT || '60' }}
       ELDIS_REQUEST_PAUSE_SECONDS: ${{ vars.ELDIS_REQUEST_PAUSE_SECONDS || '0' }}
+      BOT_REFRESH_SECONDS: ${{ vars.BOT_REFRESH_SECONDS || '1800' }}
 
       ELDIS_ACCOUNT_1_NAME: ${{ vars.ELDIS_ACCOUNT_1_NAME || 'account_1' }}
       ELDIS_ACCOUNT_1_KEY: ${{ secrets.ELDIS_ACCOUNT_1_KEY }}
@@ -47,13 +62,18 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Collect data and generate JSON
+      - name: Run bot service
         run: |
-          python eldis_collector.py --collect --output eldis_reports.json
-          python build_dashboard.py \
-            --reports-json eldis_reports.json \
-            --json-output parsed_reports.json \
-            --no-weather-fetch
+          set +e
+          timeout 20700 python telegram_bot_service.py
+          code=$?
+          set -e
+          if [ "$code" -ne 0 ] && [ "$code" -ne 124 ]; then
+            exit "$code"
+          fi
 
-      - name: Run bot for 20 minutes
-        run: timeout 1200 python telegram_bot.py || true
+      - name: Start next bot run
+        if: ${{ success() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run run_bot.yml --ref "${GITHUB_REF_NAME}"

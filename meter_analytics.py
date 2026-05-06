@@ -205,11 +205,6 @@ def annotate_weather(
             row["outside_temp_source"] = "weather"
             continue
 
-        ta = numeric(row.get("ta"))
-        if ta is not None and -45 <= ta <= 30:
-            row["outside_temp_used"] = ta
-            row["outside_temp_source"] = "meter_ta"
-
 
 def build_daily_stats(readings: list[dict[str, Any]]) -> list[dict[str, Any]]:
     grouped: dict[date, list[dict[str, Any]]] = {}

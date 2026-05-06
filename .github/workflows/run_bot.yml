@@ -1,0 +1,29 @@
+name: Run Telegram Bot (20 min)
+
+on:
+  workflow_dispatch: # Триггер для появления кнопки ручного запуска
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run bot for 20 minutes
+        env:
+          # Подтягиваем токен из секретов GitHub
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        # Команда timeout принудительно завершит работу скрипта через 1200 секунд
+        # Конструкция '|| true' нужна, чтобы GitHub не считал таймаут ошибкой (красным крестиком)
+        run: timeout 1200 python telegram_bot.py || true

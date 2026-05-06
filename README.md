@@ -170,6 +170,8 @@ cd /Users/vitaliigudelev/Documents/Moek_dash
 
 Бот читает уже собранный `parsed_reports.json`, поэтому перед запуском нужно хотя бы один раз выполнить `./run_pipeline.sh`, `./run_eldis_pipeline.sh` или `python3 build_dashboard.py --pdf-dir mailru_pdfs`.
 
+В GitHub Actions бот запускается автоматически каждые 20 минут через `.github/workflows/run_bot.yml`. Для этого в Secrets нужен `TELEGRAM_BOT_TOKEN`; ограничение доступа можно задать через variable или secret `TELEGRAM_ALLOWED_CHAT_IDS`.
+
 Проверка генератора без Telegram:
 
 ```bash

@@ -29,10 +29,20 @@ COLUMNS = [
 ]
 
 FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
     "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
     "/Library/Fonts/Arial Unicode.ttf",
     "/System/Library/Fonts/Supplemental/Arial.ttf",
     "/System/Library/Fonts/Supplemental/Verdana.ttf",
+]
+
+BOLD_FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/truetype/liberation2/LiberationSans-Bold.ttf",
+    "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
 ]
 
 
@@ -360,10 +370,7 @@ def wrap_text(
 def load_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
     candidates = FONT_CANDIDATES
     if bold:
-        candidates = [
-            "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-            *FONT_CANDIDATES,
-        ]
+        candidates = [*BOLD_FONT_CANDIDATES, *FONT_CANDIDATES]
     for path in candidates:
         if Path(path).exists():
             return ImageFont.truetype(path, size=size)

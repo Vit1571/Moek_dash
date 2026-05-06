@@ -13,11 +13,13 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 
 DEFAULT_API_BASE = "https://api.eldis24.ru/api/v1"
 HOURLY_ARCHIVE_CODE = 30003
 DATE_TYPE = "dateWithTimeBias"
+MOSCOW_TZ = ZoneInfo("Europe/Moscow")
 RESOURCE_ENDPOINTS = {
     "heat": {
         "endpoint": "tv/heatInfoList",
@@ -146,7 +148,7 @@ def main() -> None:
     except EldisAuthError as exc:
         raise SystemExit(str(exc)) from exc
     payload = {
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "generated_at": moscow_now().isoformat(timespec="seconds"),
         "source": "eldis24",
         "api_base": config.api_base,
         "typeDataCode": HOURLY_ARCHIVE_CODE,
@@ -772,7 +774,7 @@ def try_api_key_fallbacks(
 
 
 def resolve_period(args: argparse.Namespace) -> tuple[datetime, datetime]:
-    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    now = moscow_now().replace(minute=0, second=0, microsecond=0)
     end_at = parse_user_datetime(args.end) if args.end else now
     if args.start:
         start_at = parse_user_datetime(args.start)
@@ -784,6 +786,10 @@ def resolve_period(args: argparse.Namespace) -> tuple[datetime, datetime]:
     if start_at >= end_at:
         raise SystemExit("Start date must be earlier than end date.")
     return start_at, end_at
+
+
+def moscow_now() -> datetime:
+    return datetime.now(MOSCOW_TZ).replace(tzinfo=None)
 
 
 def parse_user_datetime(value: str) -> datetime:
